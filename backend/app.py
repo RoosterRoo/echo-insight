@@ -85,17 +85,17 @@ def upload():
     #      "size": os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], filename)), 
     #      "status": "Ready for AI Analysis"})
     try:
-        # 1. Get audio (extract if video)
         audio_path, is_temp = get_audio_path(original_file_path)
 
-        # 2. Run your existing Librosa analysis
-        results = analyze_audio(audio_path)
-        #results = {"status": "Success", "message": "Ready for analysis!"} 
-
-        # 3. Cleanup: Delete BOTH files immediately
-        if os.path.exists(original_file_path):
+        # IF IT WAS A VIDEO: Delete the original video NOW to free up space/RAM
+        if is_temp and os.path.exists(original_file_path):
             os.remove(original_file_path)
-        if is_temp and os.path.exists(audio_path):
+
+        # Now run analysis on the much smaller audio file
+        results = analyze_audio(audio_path)
+
+        # Cleanup the temporary audio file
+        if os.path.exists(audio_path):
             os.remove(audio_path)
 
         return jsonify(results)
