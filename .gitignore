@@ -1,0 +1,14 @@
+# Node (React)
+node_modules/
+dist/
+.env.local
+.env.development.local
+
+# Python (Flask)
+venv/
+__pycache__/
+*.pyc
+.env
+
+# Local Storage
+backend/uploads/
