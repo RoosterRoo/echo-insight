@@ -41,34 +41,46 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 
 def analyze_audio(file_path):
-    # 1. Load the audio file (y = audio array, sr = sample rate)
-    y, sr = librosa.load(file_path, sr=11025, mono=True, duration=30)
+    try:
+        # Load only 10 seconds for the fastest possible check
+        y, sr = librosa.load(file_path, sr=11025, mono=True, duration=10)
 
-    # 2. Extract Tempo (Beats Per Minute)
-    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        # 1. Get duration FIRST
+        duration = librosa.get_duration(y=y, sr=sr)
 
-    # 3. Extract Pitch (Chroma Features)
-    # This tells us which musical notes (C, C#, D...) are strongest
-    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-    mean_chroma = np.mean(chroma, axis=1)
-    notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-    main_note = notes[np.argmax(mean_chroma)]
+        # 2. Get Tempo
+        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
 
-    # 4. Extract Spectral Centroid (Indicates "Brightness" of the voice)
-    cent = librosa.feature.spectral_centroid(y=y, sr=sr)
-    avg_brightness = np.mean(cent)
-    duration = librosa.get_duration(y=y, sr=sr)
-    del y
-    gc.collect()
+        # 3. Get Chroma
+        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+        mean_chroma = np.mean(chroma, axis=1)
+        notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        main_note = notes[np.argmax(mean_chroma)]
 
-    return {
-        "tempo": round(float(tempo), 2),
-        "key": main_note,
-        "brightness": round(float(avg_brightness), 2),
-        "duration_sec": round(float(duration), 2),
-        "chroma_data": mean_chroma.tolist() # Array for a bar chart in React
-    }
+        # 4. Get Brightness
+        cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+        avg_brightness = np.mean(cent)
 
+        # Store results in a plain dictionary
+        output = {
+            "tempo": round(float(tempo), 2),
+            "key": str(main_note),
+            "brightness": round(float(avg_brightness), 2),
+            "duration_sec": round(float(duration), 2),
+            "chroma_data": mean_chroma.tolist()
+        }
+
+        # CLEANUP LAST
+        del y
+        gc.collect()
+        
+        return output
+
+    except Exception as e:
+        print(f"Analysis Crash: {str(e)}")
+        raise e # Let the upload route catch this
+    
+    
 # This tells MoviePy exactly where the portable FFmpeg binary is located
 # Allowing React to talk to this API
 
@@ -79,6 +91,7 @@ def upload():
     filename = secure_filename(file.filename)
     original_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(original_file_path)
+    print("File saved. Starting analysis...")
     # return jsonify(
     #     {"message": "File saved locally!", 
     #      "filename": filename, 
