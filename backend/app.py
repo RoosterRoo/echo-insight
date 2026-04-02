@@ -60,9 +60,9 @@ def analyze_audio(file_path):
 
         # Store results in a plain dictionary
         output = {
-            "tempo": round(float(tempo), 2),
+            "tempo": round(float(np.atleast_1d(tempo).item(0)), 2), 
             "key": str(main_note),
-            "brightness": round(float(avg_brightness), 2),
+            "brightness": round(float(np.atleast_1d(avg_brightness).item(0)), 2),
             "duration_sec": round(float(duration), 2),
             "chroma_data": mean_chroma.tolist()
         }
