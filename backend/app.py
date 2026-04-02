@@ -1,6 +1,7 @@
 import os
 import shutil
 import gc
+import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -144,20 +145,19 @@ def clear_uploads():
 VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
 
 def get_audio_path(file_path):
-    """Returns a path to an audio file. Extracts from video if necessary."""
     ext = os.path.splitext(file_path)[1].lower()
-    
     if ext in VIDEO_EXTENSIONS:
-        print(f"Video detected ({ext}). Extracting audio...")
-        audio_path = file_path.replace(ext, "_temp_audio.mp3")
+        audio_path = file_path.replace(ext, "_temp.mp3")
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         
-        # Load video, extract audio, and CLOSE to release memory
-        with VideoFileClip(file_path) as video:
-            video.audio.write_audiofile(audio_path, logger=None)
-        
-        return audio_path, True # True means we created a temp file
-    
-    return file_path, False # It was already audio    
+        # This runs FFmpeg as a separate process, which is lighter on your Flask RAM
+        command = [
+            ffmpeg_exe, '-y', '-i', file_path, 
+            '-vn', '-acodec', 'libmp3lame', '-q:a', '2', audio_path
+        ]
+        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return audio_path, True
+    return file_path, False   
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
