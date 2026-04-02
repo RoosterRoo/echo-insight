@@ -10,6 +10,35 @@ except ImportError:
 
 import imageio_ffmpeg
 
+import librosa
+import numpy as np
+
+def analyze_audio(file_path):
+    # 1. Load the audio file (y = audio array, sr = sample rate)
+    y, sr = librosa.load(file_path)
+
+    # 2. Extract Tempo (Beats Per Minute)
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+
+    # 3. Extract Pitch (Chroma Features)
+    # This tells us which musical notes (C, C#, D...) are strongest
+    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+    mean_chroma = np.mean(chroma, axis=1)
+    notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    main_note = notes[np.argmax(mean_chroma)]
+
+    # 4. Extract Spectral Centroid (Indicates "Brightness" of the voice)
+    cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+    avg_brightness = np.mean(cent)
+
+    return {
+        "tempo": round(float(tempo), 2),
+        "key": main_note,
+        "brightness": round(float(avg_brightness), 2),
+        "duration_sec": round(librosa.get_duration(y=y, sr=sr), 2),
+        "chroma_data": mean_chroma.tolist() # Array for a bar chart in React
+    }
+
 # This tells MoviePy exactly where the portable FFmpeg binary is located
 os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
 
@@ -48,8 +77,8 @@ def upload():
         audio_path, is_temp = get_audio_path(original_file_path)
 
         # 2. Run your existing Librosa analysis
-        # results = analyze_audio(audio_path)
-        results = {"status": "Success", "message": "Ready for analysis!"} 
+        results = analyze_audio(audio_path)
+        #results = {"status": "Success", "message": "Ready for analysis!"} 
 
         # 3. Cleanup: Delete BOTH files immediately
         if os.path.exists(original_file_path):

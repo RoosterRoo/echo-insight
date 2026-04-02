@@ -1,10 +1,12 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import AudioReport from './AudioReport';
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0); // 0 to 100
   const [status, setStatus] = useState('idle');
+  const [analysisData, setAnalysisData] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleUpload = async () => {
@@ -37,6 +39,7 @@ const FileUpload = () => {
       );
 
       setStatus('success');
+      setAnalysisData(response.data);
       // Reset the input after a short delay
       setTimeout(() => {
         setFile(null);
@@ -105,6 +108,7 @@ const FileUpload = () => {
           ✓ Upload Complete!
         </p>
       )}
+      {analysisData && <AudioReport data={analysisData} />}
     </div>
   );
 };

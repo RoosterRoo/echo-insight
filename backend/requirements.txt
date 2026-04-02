@@ -12,3 +12,6 @@ werkzeug==3.0.6
 zipp==3.20.2
 moviepy
 imageio-ffmpeg
+librosa
+soundfile
+numpy
