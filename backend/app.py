@@ -3,7 +3,10 @@ import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-from moviepy.editor import VideoFileClip
+try:
+    from moviepy.editor import VideoFileClip
+except ImportError:
+    from moviepy.video.io.VideoFileClip import VideoFileClip
 
 import imageio_ffmpeg
 
