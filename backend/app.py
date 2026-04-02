@@ -4,7 +4,15 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://echo-insight-kappa.vercel.app"}}) # Allowing React to talk to this API
+CORS(app, resources={
+    r"/*": {
+        "origins": [          # For local development
+            "https://echo-insight-kappa.vercel.app"  # Your production frontend
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+}) # Allowing React to talk to this API
 
 UPLOAD_FOLDER = 'uploads'
 
