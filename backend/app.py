@@ -13,14 +13,6 @@ import imageio_ffmpeg
 import librosa
 import numpy as np
 
-os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
-
-UPLOAD_FOLDER = 'uploads'
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-    print(f"Created missing folder: {UPLOAD_FOLDER}")
-
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -33,6 +25,16 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization"]
     }
 }) 
+
+
+os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
+
+UPLOAD_FOLDER = 'uploads'
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+    print(f"Created missing folder: {UPLOAD_FOLDER}")
+
 
 def analyze_audio(file_path):
     # 1. Load the audio file (y = audio array, sr = sample rate)
