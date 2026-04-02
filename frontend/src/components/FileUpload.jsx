@@ -9,6 +9,20 @@ const FileUpload = () => {
   const [analysisData, setAnalysisData] = useState(null);
   const fileInputRef = useRef(null);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    const MAX_SIZE_MB = 15; // 15MB is a safe limit for 512MB RAM
+
+    if (file && file.size > MAX_SIZE_MB * 1024 * 1024) {
+      alert(
+        `File is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Please keep it under 15MB.`,
+      );
+      e.target.value = null; // Clear the input
+      return;
+    }
+    setFile(file);
+  };
+
   const handleUpload = async () => {
     if (!file) return;
 
@@ -61,7 +75,7 @@ const FileUpload = () => {
         type="file"
         ref={fileInputRef}
         accept="video/*,audio/*"
-        onChange={(e) => setFile(e.target.files[0])}
+        onChange={handleFileChange}
         className="block w-full text-sm text-gray-500 mb-4"
       />
 

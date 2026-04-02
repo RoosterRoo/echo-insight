@@ -1,5 +1,6 @@
 import os
 import shutil
+import gc
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -40,7 +41,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 def analyze_audio(file_path):
     # 1. Load the audio file (y = audio array, sr = sample rate)
-    y, sr = librosa.load(file_path)
+    y, sr = librosa.load(file_path, sr=11025, mono=True)
 
     # 2. Extract Tempo (Beats Per Minute)
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
@@ -55,6 +56,9 @@ def analyze_audio(file_path):
     # 4. Extract Spectral Centroid (Indicates "Brightness" of the voice)
     cent = librosa.feature.spectral_centroid(y=y, sr=sr)
     avg_brightness = np.mean(cent)
+
+    del y
+    gc.collect()
 
     return {
         "tempo": round(float(tempo), 2),
