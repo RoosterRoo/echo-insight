@@ -13,6 +13,10 @@ import imageio_ffmpeg
 import librosa
 import numpy as np
 
+os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
+
+UPLOAD_FOLDER = 'uploads'
+
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -27,9 +31,7 @@ CORS(app, resources={
 }) 
 
 
-os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
 
-UPLOAD_FOLDER = 'uploads'
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
