@@ -1,4 +1,5 @@
 import os
+import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -51,6 +52,24 @@ def list_files():
         })
     else:
         return jsonify({"error": "Upload folder does not exist"}), 404
+    
+@app.route('/debug/clear-uploads', methods=['POST'])
+def clear_uploads():
+    
+    folder = app.config['UPLOAD_FOLDER']
+    
+    try:
+        # Delete everything inside the folder
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path) # Delete file
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path) # Delete subfolder
+        
+        return {"status": "success", "message": "Uploads folder cleared!"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500    
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
