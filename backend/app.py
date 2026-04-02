@@ -13,6 +13,27 @@ import imageio_ffmpeg
 import librosa
 import numpy as np
 
+os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
+
+UPLOAD_FOLDER = 'uploads'
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+    print(f"Created missing folder: {UPLOAD_FOLDER}")
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+CORS(app, resources={
+    r"/*": {
+        "origins": [          # For local development
+            "https://echo-insight-kappa.vercel.app"  # Your production frontend
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+}) 
+
 def analyze_audio(file_path):
     # 1. Load the audio file (y = audio array, sr = sample rate)
     y, sr = librosa.load(file_path)
@@ -40,26 +61,8 @@ def analyze_audio(file_path):
     }
 
 # This tells MoviePy exactly where the portable FFmpeg binary is located
-os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
+# Allowing React to talk to this API
 
-app = Flask(__name__)
-CORS(app, resources={
-    r"/*": {
-        "origins": [          # For local development
-            "https://echo-insight-kappa.vercel.app"  # Your production frontend
-        ],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-}) # Allowing React to talk to this API
-
-UPLOAD_FOLDER = 'uploads'
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-    print(f"Created missing folder: {UPLOAD_FOLDER}")
-
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/upload', methods=['POST'])
 def upload():
