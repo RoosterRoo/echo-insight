@@ -57,7 +57,7 @@ def analyze_audio(file_path):
     # 4. Extract Spectral Centroid (Indicates "Brightness" of the voice)
     cent = librosa.feature.spectral_centroid(y=y, sr=sr)
     avg_brightness = np.mean(cent)
-
+    duration = librosa.get_duration(y=y, sr=sr)
     del y
     gc.collect()
 
@@ -65,7 +65,7 @@ def analyze_audio(file_path):
         "tempo": round(float(tempo), 2),
         "key": main_note,
         "brightness": round(float(avg_brightness), 2),
-        "duration_sec": round(librosa.get_duration(y=y, sr=sr), 2),
+        "duration_sec": round(float(duration), 2),
         "chroma_data": mean_chroma.tolist() # Array for a bar chart in React
     }
 
