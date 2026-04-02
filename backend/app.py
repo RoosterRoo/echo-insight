@@ -22,18 +22,7 @@ UPLOAD_FOLDER = 'uploads'
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-CORS(app, resources={
-    r"/*": {
-        "origins": [          # For local development
-            "https://echo-insight-kappa.vercel.app"  # Your production frontend
-        ],
-        "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"]
-    }
-}) 
-
-
-
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
