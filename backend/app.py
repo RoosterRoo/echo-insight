@@ -5,6 +5,11 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from moviepy.editor import VideoFileClip
 
+import imageio_ffmpeg
+
+# This tells MoviePy exactly where the portable FFmpeg binary is located
+os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
+
 app = Flask(__name__)
 CORS(app, resources={
     r"/*": {
