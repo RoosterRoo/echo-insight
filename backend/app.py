@@ -17,7 +17,11 @@ import numpy as np
 
 os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
 
-UPLOAD_FOLDER = 'uploads'
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -31,18 +35,22 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 def analyze_audio(file_path):
     try:
-        # Load only 10 seconds for the fastest possible check
-        y, sr = librosa.load(file_path, sr=11025, mono=True, duration=10)
+        print(f"DEBUG: Starting load for {file_path}")
+        # Load only 5 seconds for the absolute minimum RAM usage
+        y, sr = librosa.load(file_path, sr=11025, mono=True, duration=5)
+        print("DEBUG: File loaded into memory")
 
-        # 1. Get duration FIRST
         duration = librosa.get_duration(y=y, sr=sr)
+        print(f"DEBUG: Duration calculated: {duration}")
 
-        # 2. Get Tempo
+        # This line is the most CPU/RAM intensive
         tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+        print(f"DEBUG: Tempo calculated: {tempo}")
 
-        # 3. Get Chroma
         chroma = librosa.feature.chroma_stft(y=y, sr=sr)
         mean_chroma = np.mean(chroma, axis=1)
+        print("DEBUG: Chroma analysis complete")
+        
         notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
         main_note = notes[np.argmax(mean_chroma)]
 
