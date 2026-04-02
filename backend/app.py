@@ -24,5 +24,20 @@ def upload():
 def health():
     return jsonify({"status": "ok"})
 
+@app.route('/debug/files', methods=['GET'])
+def list_files():
+    # This lists everything in your upload folder
+    upload_path = app.config['UPLOAD_FOLDER']
+    
+    if os.path.exists(upload_path):
+        files = os.listdir(upload_path)
+        return jsonify({
+            "folder": upload_path,
+            "files": files,
+            "count": len(files)
+        })
+    else:
+        return jsonify({"error": "Upload folder does not exist"}), 404
+
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
