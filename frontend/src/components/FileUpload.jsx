@@ -57,6 +57,7 @@ const FileUpload = () => {
       <input
         type="file"
         ref={fileInputRef}
+        accept="video/*,audio/*"
         onChange={(e) => setFile(e.target.files[0])}
         className="block w-full text-sm text-gray-500 mb-4"
       />

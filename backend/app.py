@@ -3,6 +3,7 @@ import shutil
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from moviepy.editor import VideoFileClip
 
 app = Flask(__name__)
 CORS(app, resources={
@@ -27,12 +28,33 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def upload():
     file = request.files['file']
     filename = secure_filename(file.filename)
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    return jsonify(
-        {"message": "File saved locally!", 
-         "filename": filename, 
-         "size": os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], filename)), 
-         "status": "Ready for AI Analysis"})
+    original_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(original_file_path)
+    # return jsonify(
+    #     {"message": "File saved locally!", 
+    #      "filename": filename, 
+    #      "size": os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], filename)), 
+    #      "status": "Ready for AI Analysis"})
+    try:
+        # 1. Get audio (extract if video)
+        audio_path, is_temp = get_audio_path(original_file_path)
+
+        # 2. Run your existing Librosa analysis
+        # results = analyze_audio(audio_path)
+        results = {"status": "Success", "message": "Ready for analysis!"} 
+
+        # 3. Cleanup: Delete BOTH files immediately
+        if os.path.exists(original_file_path):
+            os.remove(original_file_path)
+        if is_temp and os.path.exists(audio_path):
+            os.remove(audio_path)
+
+        return jsonify(results)
+
+    except Exception as e:
+        # Emergency cleanup if something crashes
+        if os.path.exists(original_file_path): os.remove(original_file_path)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -70,6 +92,24 @@ def clear_uploads():
         return {"status": "success", "message": "Uploads folder cleared!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}, 500    
+    
+VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+
+def get_audio_path(file_path):
+    """Returns a path to an audio file. Extracts from video if necessary."""
+    ext = os.path.splitext(file_path)[1].lower()
+    
+    if ext in VIDEO_EXTENSIONS:
+        print(f"Video detected ({ext}). Extracting audio...")
+        audio_path = file_path.replace(ext, "_temp_audio.mp3")
+        
+        # Load video, extract audio, and CLOSE to release memory
+        with VideoFileClip(file_path) as video:
+            video.audio.write_audiofile(audio_path, logger=None)
+        
+        return audio_path, True # True means we created a temp file
+    
+    return file_path, False # It was already audio    
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)
