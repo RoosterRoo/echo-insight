@@ -5,10 +5,10 @@ import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-try:
-    from moviepy.editor import VideoFileClip
-except ImportError:
-    from moviepy.video.io.VideoFileClip import VideoFileClip
+# try:
+#     from moviepy.editor import VideoFileClip
+# except ImportError:
+#     from moviepy.video.io.VideoFileClip import VideoFileClip
 
 import imageio_ffmpeg
 
@@ -42,7 +42,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 def analyze_audio(file_path):
     # 1. Load the audio file (y = audio array, sr = sample rate)
-    y, sr = librosa.load(file_path, sr=11025, mono=True)
+    y, sr = librosa.load(file_path, sr=11025, mono=True, duration=30)
 
     # 2. Extract Tempo (Beats Per Minute)
     tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
