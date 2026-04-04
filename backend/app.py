@@ -35,43 +35,58 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 def analyze_audio(file_path):
     try:
-        print(f"DEBUG: Starting load for {file_path}")
-        # Load only 5 seconds for the absolute minimum RAM usage
-        y, sr = librosa.load(file_path, sr=11025, mono=True, duration=5)
-        print("DEBUG: File loaded into memory")
-
-        duration = librosa.get_duration(y=y, sr=sr)
-        print(f"DEBUG: Duration calculated: {duration}")
-
-        # This line is the most CPU/RAM intensive
-        tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-        print(f"DEBUG: Tempo calculated: {tempo}")
-
-        chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-        mean_chroma = np.mean(chroma, axis=1)
-        print("DEBUG: Chroma analysis complete")
+        # 1. Get total duration without loading the audio into RAM
+        total_duration = librosa.get_duration(path=file_path)
+        chunk_size = 30  # 30-second windows
         
-        notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-        main_note = notes[np.argmax(mean_chroma)]
+        # Accumulators for our data
+        all_chromas = []
+        all_tempos = []
+        all_brightness = []
+        
+        current_offset = 0
+        
+        print(f"Starting chunked analysis for {total_duration:.2f}s...")
 
-        # 4. Get Brightness
-        cent = librosa.feature.spectral_centroid(y=y, sr=sr)
-        avg_brightness = np.mean(cent)
+        while current_offset < total_duration:
+            # Load only the current window
+            # duration=chunk_size ensures we don't over-load
+            y, sr = librosa.load(file_path, sr=11025, mono=True, 
+                                offset=current_offset, duration=chunk_size)
+            
+            # --- Process this chunk ---
+            if len(y) > 0:
+                # 1. Chroma (Note distribution for this 30s)
+                chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+                all_chromas.append(np.mean(chroma, axis=1))
+                
+                # 2. Tempo
+                tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+                all_tempos.append(np.atleast_1d(tempo).item(0))
+                
+                # 3. Brightness
+                cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+                all_brightness.append(np.mean(cent))
 
-        # Store results in a plain dictionary
-        output = {
-            "tempo": round(float(np.atleast_1d(tempo).item(0)), 2), 
-            "key": str(main_note),
-            "brightness": round(float(np.atleast_1d(avg_brightness).item(0)), 2),
-            "duration_sec": round(float(duration), 2),
-            "chroma_data": mean_chroma.tolist()
+            # --- Memory Cleanup ---
+            del y
+            gc.collect() # Force garbage collection after every chunk
+            
+            current_offset += chunk_size
+            print(f"Processed up to {current_offset}s...")
+
+        # Final Aggregation (Averaging the chunks)
+        final_chroma = np.mean(all_chromas, axis=0)
+        final_tempo = np.mean(all_tempos)
+        final_brightness = np.mean(all_brightness)
+
+        return {
+            "tempo": round(float(final_tempo), 2),
+            "key": "Detected", # You can add key logic here
+            "brightness": round(float(final_brightness), 2),
+            "duration_sec": round(float(total_duration), 2),
+            "chroma_data": final_chroma.tolist()
         }
-
-        # CLEANUP LAST
-        del y
-        gc.collect()
-        
-        return output
 
     except Exception as e:
         print(f"Analysis Crash: {str(e)}")
