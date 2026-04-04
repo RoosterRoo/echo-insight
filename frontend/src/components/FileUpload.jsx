@@ -44,11 +44,12 @@ const FileUpload = () => {
   const handleUpload = async () => {
     if (!file) return;
 
+    console.log('1. Starting upload process...');
     setStatus('uploading');
-    setProgress(0);
+    setAnalysisData(null);
 
     const formData = new FormData();
-    formData.append('file', file); // Fixed: was 'selectedFile'
+    formData.append('file', file);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
@@ -56,23 +57,37 @@ const FileUpload = () => {
         body: formData,
       });
 
-      if (!response.ok) throw new Error('Server upload failed');
+      console.log('2. Response received from server. Status:', response.status);
 
-      // Setup the stream reader
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server Error: ${errorText}`);
+      }
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
 
+      console.log('3. Entering stream reader loop...');
+
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('4. Stream finished (done: true)');
+          break;
+        }
 
         const textChunk = decoder.decode(value, { stream: true });
-        // Split by newline for NDJSON
+        console.log('RAW CHUNK RECEIVED:', textChunk);
+
         const lines = textChunk.split('\n').filter((line) => line.trim());
 
         for (const line of lines) {
           try {
+            // Safety check: ignore non-JSON whitespace/buffer-breakers
+            if (!line.startsWith('{')) continue;
+
             const data = JSON.parse(line);
+            console.log('PARSED DATA:', data);
 
             if (data.status === 'processing' || data.status === 'starting') {
               setStatus('processing');
@@ -80,23 +95,24 @@ const FileUpload = () => {
             }
 
             if (data.status === 'complete') {
+              console.log('5. Analysis Complete! Data received.');
               setAnalysisData(data.analysis);
-              setProgress(100);
               setStatus('success');
+              setProgress(100);
             }
 
             if (data.status === 'error') {
-              alert(`Analysis Error: ${data.message}`);
-              setStatus('error');
+              throw new Error(data.message);
             }
           } catch (e) {
-            console.error('Error parsing stream line:', e);
+            console.warn('Could not parse line as JSON:', line);
           }
         }
       }
     } catch (err) {
-      console.error('Connection lost:', err);
+      console.error('CRITICAL ERROR:', err);
       setStatus('error');
+      alert(`Upload Failed: ${err.message}`);
     }
   };
 
