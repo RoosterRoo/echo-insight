@@ -44,7 +44,7 @@ const FileUpload = () => {
   const handleUpload = async () => {
     if (!file) return;
 
-    console.log('1. Starting upload...');
+    console.log('🚀 1. Button Clicked. File:', file.name);
     setStatus('uploading');
     setProgress(0);
 
@@ -57,59 +57,59 @@ const FileUpload = () => {
         body: formData,
       });
 
-      if (!response.ok) throw new Error(`Server Error: ${response.status}`);
+      console.log('📡 2. Server responded with status:', response.status);
+
+      if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let streamBuffer = ''; // Persistent buffer for fragmented data
-
-      console.log('2. Stream opened. Reading...');
+      let buffer = '';
 
       while (true) {
         const { value, done } = await reader.read();
 
-        // Even if 'done' is true, there might be remaining data in 'value'
         if (value) {
           const chunk = decoder.decode(value, { stream: true });
-          streamBuffer += chunk;
+          console.log('📥 RAW CHUNK:', chunk); // This MUST appear if Response tab is not empty
+          buffer += chunk;
 
-          // Process every complete line in the buffer
-          let lines = streamBuffer.split('\n');
-          // Keep the last (potentially incomplete) line in the buffer
-          streamBuffer = lines.pop();
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // Save incomplete line for next chunk
 
           for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || !trimmedLine.startsWith('{')) continue;
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith('{')) continue;
 
             try {
-              const data = JSON.parse(trimmedLine);
-              console.log('RECEIVED DATA:', data);
+              const data = JSON.parse(trimmed);
+              console.log('💎 PARSED JSON:', data);
 
-              if (data.status === 'processing') {
+              if (data.status === 'processing' || data.status === 'starting') {
                 setStatus('processing');
-                setProgress(data.progress);
+                setProgress(data.progress || 0);
               }
 
               if (data.status === 'complete') {
-                console.log('SUCCESS: Setting analysis data.');
+                console.log('✅ SUCCESS: Analysis Ready.');
                 setAnalysisData(data.analysis);
                 setStatus('success');
                 setProgress(100);
               }
+
+              if (data.status === 'error') throw new Error(data.message);
             } catch (e) {
-              console.error('JSON Parse Error on line:', trimmedLine);
+              console.error('❌ JSON Parse Error:', e, 'on line:', trimmed);
             }
           }
         }
 
         if (done) {
-          console.log('3. Stream finished.');
+          console.log('🏁 3. Reader Done.');
           break;
         }
       }
     } catch (err) {
-      console.error('CRITICAL ERROR:', err);
+      console.error('💥 CRITICAL ERROR:', err);
       setStatus('error');
     }
   };
