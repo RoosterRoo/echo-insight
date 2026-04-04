@@ -8,6 +8,21 @@ const FileUpload = () => {
   const [status, setStatus] = useState('idle');
   const [analysisData, setAnalysisData] = useState(null);
   const fileInputRef = useRef(null);
+  const [targetNote, setTargetNote] = useState('C');
+  const noteNames = [
+    'C',
+    'C#',
+    'D',
+    'D#',
+    'E',
+    'F',
+    'F#',
+    'G',
+    'G#',
+    'A',
+    'A#',
+    'B',
+  ];
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -70,6 +85,23 @@ const FileUpload = () => {
   return (
     <div className="max-w-md mx-auto p-6 bg-white shadow-md rounded-lg">
       <h2 className="text-xl font-bold mb-4">AI Content Analyzer</h2>
+
+      <div className="mb-6 p-4 bg-gray-800 rounded-lg">
+        <label className="block text-sm font-medium text-gray-400 mb-2">
+          What note are you aiming for?
+        </label>
+        <select
+          value={targetNote}
+          onChange={(e) => setTargetNote(e.target.value)}
+          className="bg-gray-700 text-white p-2 rounded w-full border border-gray-600"
+        >
+          {noteNames.map((note) => (
+            <option key={note} value={note}>
+              {note}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <input
         type="file"
