@@ -128,7 +128,9 @@ def upload():
                 os.remove(original_path)
 
     response = Response(generate_analysis(), content_type='application/x-ndjson')
-    response.headers['X-Accel-Buffering'] = 'no'  # Prevents proxy buffering
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['X-Accel-Buffering'] = 'no'
+    response.headers['Cache-Control'] = 'no-cache'  # Prevents proxy buffering
     return response
 
 @app.route('/health', methods=['GET'])
