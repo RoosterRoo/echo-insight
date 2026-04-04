@@ -39,33 +39,32 @@ const AudioReport = ({ data, targetNote }) => {
   }));
 
   return (
-    <div className="mt-8">
-      <div className="mb-6 p-6 bg-blue-900/20 border border-blue-500/50 rounded-xl text-center">
-        <h2 className="text-gray-400 uppercase text-xs tracking-widest">
-          Target Accuracy
-        </h2>
-        <p className="text-5xl font-mono font-bold text-blue-400">
-          {accuracy}%
-        </p>
-        <p className="text-sm text-gray-500 mt-2">
-          {accuracy > 40
-            ? 'Great job hitting the target!'
-            : 'Keep practicing that pitch!'}
-        </p>
+    <div className="mt-8 space-y-6">
+      {/* 1. Accuracy Card */}
+      <div className="p-6 bg-gray-800 rounded-xl border border-gray-700 text-center">
+        <h3 className="text-gray-400 text-sm uppercase">Pitch Accuracy</h3>
+        <p className="text-4xl font-bold text-indigo-400">{accuracy}%</p>
       </div>
 
-      <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer>
+      {/* 2. The Chart Container - THIS IS THE FIX */}
+      <div className="h-[400px] w-full bg-gray-900 p-4 rounded-xl border border-gray-800">
+        <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData}>
-            <XAxis dataKey="note" stroke="#9CA3AF" />
+            <XAxis dataKey="note" stroke="#94a3b8" />
             <YAxis hide />
-            <Tooltip cursor={{ fill: 'transparent' }} />
-            <Bar dataKey="intensity">
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#1e293b',
+                border: 'none',
+                borderRadius: '8px',
+              }}
+              itemStyle={{ color: '#818cf8' }}
+            />
+            <Bar dataKey="intensity" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  // Highlight Target in Gold, others in Gray/Blue
-                  fill={entry.isTarget ? '#FBBF24' : '#374151'}
+                  fill={entry.isTarget ? '#fbbf24' : '#334155'}
                 />
               ))}
             </Bar>
