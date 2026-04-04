@@ -5,10 +5,10 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  CartesianGrid,
+  Cell,
 } from 'recharts';
 
-const AudioReport = ({ data }) => {
+const AudioReport = ({ data, targetNote }) => {
   const noteNames = [
     'C',
     'C#',
@@ -23,27 +23,52 @@ const AudioReport = ({ data }) => {
     'A#',
     'B',
   ];
+
+  // Find the intensity of the target note
+  const targetIndex = noteNames.indexOf(targetNote);
+  const targetIntensity = data.chroma_data[targetIndex];
+  const totalIntensity = data.chroma_data.reduce((a, b) => a + b, 0);
+
+  // Calculate accuracy as a percentage of total energy
+  const accuracy = ((targetIntensity / totalIntensity) * 100).toFixed(1);
+
   const chartData = data.chroma_data.map((value, index) => ({
     note: noteNames[index],
     intensity: parseFloat((value * 100).toFixed(2)),
+    isTarget: noteNames[index] === targetNote,
   }));
 
   return (
-    <div className="bg-gray-900 p-6 rounded-xl border border-gray-700 mt-6">
-      <h3 className="text-xl font-bold text-white mb-4">
-        Vocal Note Distribution
-      </h3>
+    <div className="mt-8">
+      <div className="mb-6 p-6 bg-blue-900/20 border border-blue-500/50 rounded-xl text-center">
+        <h2 className="text-gray-400 uppercase text-xs tracking-widest">
+          Target Accuracy
+        </h2>
+        <p className="text-5xl font-mono font-bold text-blue-400">
+          {accuracy}%
+        </p>
+        <p className="text-sm text-gray-500 mt-2">
+          {accuracy > 40
+            ? 'Great job hitting the target!'
+            : 'Keep practicing that pitch!'}
+        </p>
+      </div>
+
       <div style={{ width: '100%', height: 300 }}>
         <ResponsiveContainer>
           <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
             <XAxis dataKey="note" stroke="#9CA3AF" />
-            <YAxis stroke="#9CA3AF" unit="%" />
-            <Tooltip
-              contentStyle={{ backgroundColor: '#1F2937', border: 'none' }}
-              itemStyle={{ color: '#60A5FA' }}
-            />
-            <Bar dataKey="intensity" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+            <YAxis hide />
+            <Tooltip cursor={{ fill: 'transparent' }} />
+            <Bar dataKey="intensity">
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  // Highlight Target in Gold, others in Gray/Blue
+                  fill={entry.isTarget ? '#FBBF24' : '#374151'}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

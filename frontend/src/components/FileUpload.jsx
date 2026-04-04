@@ -154,7 +154,9 @@ const FileUpload = () => {
           ✓ Upload Complete!
         </p>
       )}
-      {analysisData && <AudioReport data={analysisData} />}
+      {analysisData && (
+        <AudioReport data={analysisData} targetNote={targetNote} />
+      )}
     </div>
   );
 };
