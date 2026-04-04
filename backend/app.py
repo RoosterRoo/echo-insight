@@ -1,188 +1,139 @@
 import os
-import shutil
 import gc
+import json
 import subprocess
-from flask import Flask, request, jsonify
+import numpy as np
+import librosa
+import imageio_ffmpeg
+from flask import Flask, request, Response, stream_with_context
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-# try:
-#     from moviepy.editor import VideoFileClip
-# except ImportError:
-#     from moviepy.video.io.VideoFileClip import VideoFileClip
 
-import imageio_ffmpeg
-
-import librosa
-import numpy as np
-
+# 1. Setup Environment
 os.environ["IMAGEIO_FFMPEG_EXE"] = imageio_ffmpeg.get_ffmpeg_exe()
-
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 150 * 1024 * 1024  # 150MB Limit
+
+# 2. CORS - Allow all origins for the "Sharing Phase"
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-CORS(app, resources={r"/*": {"origins": "*"}})
-
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-    print(f"Created missing folder: {UPLOAD_FOLDER}")
-
-
-def analyze_audio(file_path):
-    try:
-        # 1. Get total duration without loading the audio into RAM
-        total_duration = librosa.get_duration(path=file_path)
-        chunk_size = 30  # 30-second windows
-        
-        # Accumulators for our data
-        all_chromas = []
-        all_tempos = []
-        all_brightness = []
-        
-        current_offset = 0
-        
-        print(f"Starting chunked analysis for {total_duration:.2f}s...")
-
-        while current_offset < total_duration:
-            # Load only the current window
-            # duration=chunk_size ensures we don't over-load
-            y, sr = librosa.load(file_path, sr=11025, mono=True, 
-                                offset=current_offset, duration=chunk_size)
-            
-            # --- Process this chunk ---
-            if len(y) > 0:
-                # 1. Chroma (Note distribution for this 30s)
-                chroma = librosa.feature.chroma_stft(y=y, sr=sr)
-                all_chromas.append(np.mean(chroma, axis=1))
-                
-                # 2. Tempo
-                tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
-                all_tempos.append(np.atleast_1d(tempo).item(0))
-                
-                # 3. Brightness
-                cent = librosa.feature.spectral_centroid(y=y, sr=sr)
-                all_brightness.append(np.mean(cent))
-
-            # --- Memory Cleanup ---
-            del y
-            gc.collect() # Force garbage collection after every chunk
-            
-            current_offset += chunk_size
-            print(f"Processed up to {current_offset}s...")
-
-        # Final Aggregation (Averaging the chunks)
-        final_chroma = np.mean(all_chromas, axis=0)
-        final_tempo = np.mean(all_tempos)
-        final_brightness = np.mean(all_brightness)
-
-        return {
-            "tempo": round(float(final_tempo), 2),
-            "key": "Detected", # You can add key logic here
-            "brightness": round(float(final_brightness), 2),
-            "duration_sec": round(float(total_duration), 2),
-            "chroma_data": final_chroma.tolist()
-        }
-
-    except Exception as e:
-        print(f"Analysis Crash: {str(e)}")
-        raise e # Let the upload route catch this
-    
-    
-# This tells MoviePy exactly where the portable FFmpeg binary is located
-# Allowing React to talk to this API
-
-
-@app.route('/upload', methods=['POST'])
-def upload():
-    file = request.files['file']
-    filename = secure_filename(file.filename)
-    original_file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(original_file_path)
-    print("File saved. Starting analysis...")
-    # return jsonify(
-    #     {"message": "File saved locally!", 
-    #      "filename": filename, 
-    #      "size": os.path.getsize(os.path.join(app.config['UPLOAD_FOLDER'], filename)), 
-    #      "status": "Ready for AI Analysis"})
-    try:
-        audio_path, is_temp = get_audio_path(original_file_path)
-
-        # IF IT WAS A VIDEO: Delete the original video NOW to free up space/RAM
-        if is_temp and os.path.exists(original_file_path):
-            os.remove(original_file_path)
-
-        # Now run analysis on the much smaller audio file
-        results = analyze_audio(audio_path)
-
-        # Cleanup the temporary audio file
-        if os.path.exists(audio_path):
-            os.remove(audio_path)
-
-        return jsonify(results)
-
-    except Exception as e:
-        # Emergency cleanup if something crashes
-        if os.path.exists(original_file_path): os.remove(original_file_path)
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok"})
-
-@app.route('/debug/files', methods=['GET'])
-def list_files():
-    # This lists everything in your upload folder
-    upload_path = app.config['UPLOAD_FOLDER']
-    
-    if os.path.exists(upload_path):
-        files = os.listdir(upload_path)
-        return jsonify({
-            "folder": upload_path,
-            "files": files,
-            "count": len(files)
-        })
-    else:
-        return jsonify({"error": "Upload folder does not exist"}), 404
-    
-@app.route('/debug/clear-uploads', methods=['POST'])
-def clear_uploads():
-    
-    folder = app.config['UPLOAD_FOLDER']
-    
-    try:
-        # Delete everything inside the folder
-        for filename in os.listdir(folder):
-            file_path = os.path.join(folder, filename)
-            if os.path.isfile(file_path) or os.path.islink(file_path):
-                os.unlink(file_path) # Delete file
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path) # Delete subfolder
-        
-        return {"status": "success", "message": "Uploads folder cleared!"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}, 500    
-    
-VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
-
 def get_audio_path(file_path):
+    """Converts video to audio using a subprocess to save RAM."""
     ext = os.path.splitext(file_path)[1].lower()
-    if ext in VIDEO_EXTENSIONS:
+    video_extensions = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+    
+    if ext in video_extensions:
         audio_path = file_path.replace(ext, "_temp.mp3")
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-        
-        # This runs FFmpeg as a separate process, which is lighter on your Flask RAM
         command = [
             ffmpeg_exe, '-y', '-i', file_path, 
             '-vn', '-acodec', 'libmp3lame', '-q:a', '2', audio_path
         ]
+        # Run conversion in the background
         subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return audio_path, True
-    return file_path, False   
+    return file_path, False
+
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files:
+        return json.dumps({"status": "error", "message": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    filename = secure_filename(file.filename)
+    original_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    file.save(original_path)
+
+    @stream_with_context
+    def generate_analysis():
+        audio_path = None
+        is_temp_audio = False
+        
+        try:
+            # Step 1: Extraction
+            yield json.dumps({"status": "starting", "progress": 5}) + "\n"
+            audio_path, is_temp_audio = get_audio_path(original_path)
+            
+            # If we extracted audio, delete the heavy video file immediately
+            if is_temp_audio and os.path.exists(original_path):
+                os.remove(original_path)
+
+            # Step 2: Chunked Analysis
+            total_duration = librosa.get_duration(path=audio_path)
+            chunk_size = 30  # 30-second windows
+            current_offset = 0
+            
+            accumulated_chromas = []
+            all_tempos = []
+            all_brightness = []
+
+            while current_offset < total_duration:
+                # Load only the current 30s window
+                y, sr = librosa.load(audio_path, sr=11025, mono=True, 
+                                     offset=current_offset, duration=chunk_size)
+                
+                if len(y) > 0:
+                    # 1. Chroma Analysis
+                    chroma = librosa.feature.chroma_stft(y=y, sr=sr)
+                    accumulated_chromas.append(np.mean(chroma, axis=1))
+                    
+                    # 2. Tempo (Using item() to avoid scalar errors)
+                    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+                    all_tempos.append(np.atleast_1d(tempo).item(0))
+                    
+                    # 3. Brightness
+                    cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+                    all_brightness.append(np.mean(cent))
+
+                # Cleanup RAM after every chunk
+                del y
+                gc.collect()
+
+                current_offset += chunk_size
+                progress = min(int((current_offset / total_duration) * 90) + 5, 95)
+                
+                yield json.dumps({"status": "processing", "progress": progress}) + "\n"
+
+            # Step 3: Final Aggregation
+            final_chroma = np.mean(accumulated_chromas, axis=0).tolist()
+            final_tempo = np.mean(all_tempos)
+            final_brightness = np.mean(all_brightness)
+
+            yield json.dumps({
+                "status": "complete",
+                "progress": 100,
+                "analysis": {
+                    "tempo": round(float(final_tempo), 2),
+                    "brightness": round(float(final_brightness), 2),
+                    "duration_sec": round(float(total_duration), 2),
+                    "chroma_data": final_chroma
+                }
+            }) + "\n"
+
+        except Exception as e:
+            yield json.dumps({"status": "error", "message": str(e)}) + "\n"
+        
+        finally:
+            # Final Cleanup: Remove any remaining files
+            if audio_path and os.path.exists(audio_path):
+                os.remove(audio_path)
+            if not is_temp_audio and os.path.exists(original_path):
+                os.remove(original_path)
+
+    response = Response(generate_analysis(), content_type='application/x-ndjson')
+    response.headers['X-Accel-Buffering'] = 'no'  # Prevents proxy buffering
+    return response
+
+@app.route('/health', methods=['GET'])
+def health():
+    return "OK", 200
 
 if __name__ == "__main__":
     app.run(debug=True, port=5001)

@@ -1,14 +1,14 @@
 import React, { useState, useRef } from 'react';
-import axios from 'axios';
 import AudioReport from './AudioReport';
 
 const FileUpload = () => {
   const [file, setFile] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0); // 0 to 100
-  const [status, setStatus] = useState('idle');
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState('idle'); // 'idle', 'uploading', 'processing', 'success', 'error'
   const [analysisData, setAnalysisData] = useState(null);
-  const fileInputRef = useRef(null);
   const [targetNote, setTargetNote] = useState('C');
+  const fileInputRef = useRef(null);
+
   const noteNames = [
     'C',
     'C#',
@@ -25,75 +25,96 @@ const FileUpload = () => {
   ];
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
+    const selectedFile = e.target.files[0];
     const MAX_SIZE_MB = 150;
 
-    if (file && file.size > MAX_SIZE_MB * 1024 * 1024) {
+    if (selectedFile && selectedFile.size > MAX_SIZE_MB * 1024 * 1024) {
       alert(
-        `File is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Please keep it under 150MB.`,
+        `File is too large (${(selectedFile.size / 1024 / 1024).toFixed(2)}MB). Limit is 150MB.`,
       );
-      e.target.value = null; // Clear the input
+      e.target.value = null;
       return;
     }
-    setFile(file);
+    setFile(selectedFile);
+    setAnalysisData(null); // Clear old results when new file is picked
+    setProgress(0);
+    setStatus('idle');
   };
 
   const handleUpload = async () => {
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
-
     setStatus('uploading');
-    setUploadProgress(0);
+    setProgress(0);
+
+    const formData = new FormData();
+    formData.append('file', file); // Fixed: was 'selectedFile'
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/upload`,
-        formData,
-        {
-          // --- THE MAGIC HAPPENS HERE ---
-          onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total,
-            );
-            setUploadProgress(percentCompleted);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
 
-            // If we hit 100% but the server hasn't responded, it's likely "Waking up"
-            if (percentCompleted === 100) {
+      if (!response.ok) throw new Error('Server upload failed');
+
+      // Setup the stream reader
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const textChunk = decoder.decode(value, { stream: true });
+        // Split by newline for NDJSON
+        const lines = textChunk.split('\n').filter((line) => line.trim());
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+
+            if (data.status === 'processing' || data.status === 'starting') {
               setStatus('processing');
+              setProgress(data.progress || 0);
             }
-          },
-        },
-      );
 
-      setStatus('success');
-      setAnalysisData(response.data);
-      // Reset the input after a short delay
-      setTimeout(() => {
-        setFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        setUploadProgress(0);
-        setStatus('idle');
-      }, 2000);
+            if (data.status === 'complete') {
+              setAnalysisData(data.analysis);
+              setProgress(100);
+              setStatus('success');
+            }
+
+            if (data.status === 'error') {
+              alert(`Analysis Error: ${data.message}`);
+              setStatus('error');
+            }
+          } catch (e) {
+            console.error('Error parsing stream line:', e);
+          }
+        }
+      }
     } catch (err) {
+      console.error('Connection lost:', err);
       setStatus('error');
-      console.error('Upload failed:', err);
     }
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white shadow-md rounded-lg">
-      <h2 className="text-xl font-bold mb-4">AI Content Analyzer</h2>
+    <div className="max-w-md mx-auto p-6 bg-gray-900 border border-gray-800 shadow-2xl rounded-xl text-white">
+      <h2 className="text-2xl font-bold mb-6 text-center text-indigo-400">
+        EchoInsight AI
+      </h2>
 
-      <div className="mb-6 p-4 bg-gray-800 rounded-lg">
-        <label className="block text-sm font-medium text-gray-400 mb-2">
-          What note are you aiming for?
+      {/* Target Note Selector */}
+      <div className="mb-6 p-4 bg-gray-800 rounded-lg border border-gray-700">
+        <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+          Target Vocal Note
         </label>
         <select
           value={targetNote}
           onChange={(e) => setTargetNote(e.target.value)}
-          className="bg-gray-700 text-white p-2 rounded w-full border border-gray-600"
+          className="bg-gray-700 text-white p-2 rounded w-full border border-gray-600 focus:ring-2 focus:ring-indigo-500 outline-none"
         >
           {noteNames.map((note) => (
             <option key={note} value={note}>
@@ -108,54 +129,58 @@ const FileUpload = () => {
         ref={fileInputRef}
         accept="video/*,audio/*"
         onChange={handleFileChange}
-        className="block w-full text-sm text-gray-500 mb-4"
+        className="block w-full text-sm text-gray-400 mb-6 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
       />
 
       <button
         onClick={handleUpload}
         disabled={!file || status === 'uploading' || status === 'processing'}
-        className={`w-full py-2 px-4 rounded text-white font-semibold ${
-          !file ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'
+        className={`w-full py-3 px-4 rounded-lg font-bold transition-all ${
+          !file || status === 'uploading' || status === 'processing'
+            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            : 'bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-500/20'
         }`}
       >
         {status === 'uploading'
-          ? 'Uploading...'
+          ? '🚀 Sending...'
           : status === 'processing'
-            ? 'Processing...'
-            : 'Upload File'}
+            ? '🧠 Analyzing...'
+            : 'Analyze Performance'}
       </button>
 
-      {/* Progress Bar UI */}
-      {(status === 'uploading' ||
-        status === 'processing' ||
-        status === 'success') && (
-        <div className="mt-6">
-          <div className="flex justify-between mb-1">
-            <span className="text-sm font-medium text-indigo-700">
-              {status === 'processing'
-                ? 'Server is processing...'
-                : 'Uploading...'}
+      {/* Progress Section */}
+      {(status === 'uploading' || status === 'processing') && (
+        <div className="mt-8">
+          <div className="flex justify-between mb-2">
+            <span className="text-xs font-bold text-indigo-400 uppercase">
+              {status === 'processing' ? 'Server Processing' : 'Uploading File'}
             </span>
-            <span className="text-sm font-medium text-indigo-700">
-              {uploadProgress}%
+            <span className="text-xs font-bold text-indigo-400">
+              {progress}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="w-full bg-gray-800 rounded-full h-2 border border-gray-700">
             <div
-              className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${uploadProgress}%` }}
+              className="bg-indigo-500 h-full rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(99,102,241,0.5)]"
+              style={{ width: `${progress}%` }}
             ></div>
           </div>
+          <p className="text-[10px] text-gray-500 mt-2 text-center">
+            Processing in 30-second chunks to ensure accuracy.
+          </p>
         </div>
       )}
 
       {status === 'success' && (
-        <p className="mt-4 text-center text-green-600 font-medium">
-          ✓ Upload Complete!
+        <p className="mt-4 text-center text-green-400 font-bold animate-pulse">
+          ✓ Analysis Complete!
         </p>
       )}
+
       {analysisData && (
-        <AudioReport data={analysisData} targetNote={targetNote} />
+        <div className="mt-8 border-t border-gray-800 pt-6">
+          <AudioReport data={analysisData} targetNote={targetNote} />
+        </div>
       )}
     </div>
   );
