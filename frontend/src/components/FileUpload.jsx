@@ -15,7 +15,7 @@ const FileUpload = () => {
 
     if (file && file.size > MAX_SIZE_MB * 1024 * 1024) {
       alert(
-        `File is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Please keep it under 15MB.`,
+        `File is too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Please keep it under 150MB.`,
       );
       e.target.value = null; // Clear the input
       return;
