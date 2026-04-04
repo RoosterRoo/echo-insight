@@ -11,7 +11,7 @@ const FileUpload = () => {
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
-    const MAX_SIZE_MB = 15; // 15MB is a safe limit for 512MB RAM
+    const MAX_SIZE_MB = 150;
 
     if (file && file.size > MAX_SIZE_MB * 1024 * 1024) {
       alert(
